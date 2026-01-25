@@ -21,8 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 
-// --- CRITICAL IMPORTS (These fix the "Unresolved Reference" errors) ---
-// If these are still red, your files might be in the wrong folders.
+// --- FIXED IMPORTS (Solves "Unresolved Reference" errors) ---
 import com.example.amnesia.data.LoopEvent
 import com.example.amnesia.data.MemoryDatabase
 import com.example.amnesia.ui.theme.AnalyticsScreen
@@ -39,7 +38,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var ttsManager: TTSManager
 
     // Logic Components
-    // Ensure LoopDetector is imported (Alt+Enter if red)
     private val loopDetector = com.example.amnesia.logic.LoopDetector()
 
     // Database & UI State
@@ -136,8 +134,8 @@ class MainActivity : ComponentActivity() {
         // UI History
         historyList.add(0, text)
 
-        // --- FIX FOR API 35 ERROR ---
-        // Use 'removeAt' instead of 'removeLast'
+        // --- FIXED: API 35 CRASH ---
+        // We replaced 'removeLast()' with 'removeAt' so it works on all phones
         if (historyList.size > 10) {
             historyList.removeAt(historyList.lastIndex)
         }
