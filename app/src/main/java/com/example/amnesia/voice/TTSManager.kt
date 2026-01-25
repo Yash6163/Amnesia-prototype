@@ -4,6 +4,7 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import java.util.Locale
 
+
 class TTSManager(context: Context) : TextToSpeech.OnInitListener {
 
     private var tts: TextToSpeech? = null
