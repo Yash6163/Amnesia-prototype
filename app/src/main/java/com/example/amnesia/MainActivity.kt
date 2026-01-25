@@ -183,4 +183,4 @@ class MainActivity : ComponentActivity() {
         speechManager?.destroy()
         ttsManager.shutdown()
     }
-}
+}  
