@@ -2,9 +2,8 @@ package com.example.amnesia.voice
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager // <--- This is likely the missing import
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -13,90 +12,85 @@ import java.util.Locale
 
 class SpeechManager(
     private val context: Context,
-    private val onResult: (String) -> Unit
-) {
+    private val onSpeechResult: (String) -> Unit
+) : RecognitionListener {
 
-    private val recognizer: SpeechRecognizer =
-        SpeechRecognizer.createSpeechRecognizer(context)
-
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private var speechRecognizer: SpeechRecognizer? = null
     private var isListening = false
 
-    init {
-        recognizer.setRecognitionListener(object : RecognitionListener {
-
-            override fun onReadyForSpeech(params: Bundle?) {
-                Log.d("SPEECH", "Ready for speech")
-            }
-
-            override fun onBeginningOfSpeech() {
-                Log.d("SPEECH", "Speech started")
-            }
-
-            override fun onResults(results: Bundle?) {
-                isListening = false
-
-                val text =
-                    results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull()
-
-                Log.d("SPEECH", "Recognized: $text")
-
-                if (!text.isNullOrBlank()) {
-                    // ✅ ALWAYS switch to UI thread
-                    mainHandler.post {
-                        onResult(text)
-                    }
-                }
-            }
-
-            override fun onError(error: Int) {
-                isListening = false
-                Log.e("SPEECH", "Error code: $error")
-            }
-
-            override fun onEndOfSpeech() {
-                Log.d("SPEECH", "End of speech")
-            }
-
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onPartialResults(partialResults: Bundle?) {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
-    }
-
     fun startListening() {
-        if (isListening) return
+        destroy()
 
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            Log.e("SPEECH", "Speech recognition not available")
-            return
+        // Force Audio Hardware Wakeup
+        try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            audioManager.mode = AudioManager.MODE_NORMAL
+            audioManager.stopBluetoothSco()
+            audioManager.isMicrophoneMute = false
+        } catch (e: Exception) {
+            Log.e("SPEECH", "Could not reset Audio Manager: ${e.message}")
         }
 
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-            )
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        }
+        if (SpeechRecognizer.isRecognitionAvailable(context)) {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+            speechRecognizer?.setRecognitionListener(this)
 
-        // ❌ DO NOT call cancel()
-        recognizer.startListening(intent)
-        isListening = true
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1500L)
+            }
+
+            Log.d("SPEECH", "Starting fresh listener...")
+            speechRecognizer?.startListening(intent)
+            isListening = true
+        } else {
+            Log.e("SPEECH", "Recognition not available on this device")
+        }
     }
 
     fun stopListening() {
         if (isListening) {
-            recognizer.stopListening()
+            Log.d("SPEECH", "Stopping listener")
+            speechRecognizer?.stopListening()
             isListening = false
         }
     }
 
     fun destroy() {
-        recognizer.stopListening()
-        recognizer.destroy()
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            Log.e("SPEECH", "Error destroying recognizer: ${e.message}")
+        }
+        speechRecognizer = null
+        isListening = false
     }
+
+    override fun onReadyForSpeech(params: Bundle?) { Log.d("SPEECH", "Ready") }
+    override fun onBeginningOfSpeech() { Log.d("SPEECH", "Started") }
+    override fun onRmsChanged(rmsdB: Float) {}
+    override fun onBufferReceived(buffer: ByteArray?) {}
+    override fun onEndOfSpeech() { isListening = false }
+
+    override fun onError(error: Int) {
+        Log.e("SPEECH", "Error code: $error")
+        isListening = false
+        destroy()
+    }
+
+    override fun onResults(results: Bundle?) {
+        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        val text = matches?.firstOrNull() ?: ""
+        if (text.isNotEmpty()) {
+            onSpeechResult(text)
+        }
+        destroy()
+    }
+
+    override fun onPartialResults(partialResults: Bundle?) {}
+    override fun onEvent(eventType: Int, params: Bundle?) {}
 }
