@@ -1,7 +1,8 @@
-// 🔴 PAY ATTENTION TO THIS LINE:
 package com.example.amnesia.ui.theme
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -12,33 +13,77 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-// Ensure this import matches where you actually created LoopResult.kt
-// If LoopResult is red, delete this import and press Alt+Enter on LoopResult in the code
 import com.example.amnesia.logic.LoopResult
 
 @Composable
 fun VoiceScreen(
     loopResult: LoopResult?,
+    history: List<String>, // Receives history list
     onMicClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // --- 1. STATUS CARD ---
         if (loopResult != null) {
             StatusCard(loopResult)
         } else {
-            Text("Tap microphone to start monitoring", color = Color.Gray)
+            // Idle State
+            Text(
+                "Tap microphone to start monitoring",
+                color = Color.Gray,
+                modifier = Modifier.padding(top = 20.dp)
+            )
         }
 
-        Spacer(modifier = Modifier.height(60.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
+        // --- 2. HISTORY LIST (New Feature) ---
+        if (history.isNotEmpty()) {
+            Text(
+                text = "Recent Interaction Trace:",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.align(Alignment.Start)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f) // Fill available space
+                    .fillMaxWidth()
+            ) {
+                items(history) { item ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
+                        modifier = Modifier
+                            .padding(vertical = 4.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Text(
+                            text = item,
+                            modifier = Modifier.padding(12.dp),
+                            fontSize = 16.sp,
+                            color = Color.DarkGray
+                        )
+                    }
+                }
+            }
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- 3. MIC BUTTON ---
         Button(
             onClick = onMicClick,
-            modifier = Modifier.size(width = 220.dp, height = 70.dp),
+            modifier = Modifier
+                .size(width = 220.dp, height = 70.dp)
+                .padding(bottom = 16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
         ) {
             Text("🎤 Monitor Input", fontSize = 20.sp)
@@ -81,7 +126,7 @@ fun StatusCard(result: LoopResult) {
 
             if (subText.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color.Black.copy(alpha = 0.1f)) // Note: 'Divider' was renamed to 'HorizontalDivider' in newer Compose versions
+                HorizontalDivider(color = Color.Black.copy(alpha = 0.1f))
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = subText, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = Color.DarkGray)
             }

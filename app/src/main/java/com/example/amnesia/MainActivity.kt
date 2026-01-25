@@ -1,8 +1,13 @@
 package com.example.amnesia
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,56 +22,28 @@ import com.example.amnesia.voice.TTSManager
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var speechManager: SpeechManager
+    private var speechManager: SpeechManager? = null
     private lateinit var ttsManager: TTSManager
-
-    // Logic: Pure RAM loop detector
     private val loopDetector = LoopDetector()
 
     // UI State
     private var loopResult by mutableStateOf<LoopResult?>(null)
+    private val historyList = mutableStateListOf<String>()
 
     private val requestMicPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) speechManager.startListening()
+            if (granted) startFreshListeningSession()
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Initialize Text-to-Speech
         ttsManager = TTSManager(this)
-
-        // Initialize Speech Recognition
-        speechManager = SpeechManager(this) { text ->
-            runOnUiThread {
-                // 1. Process the input using your Loop Logic
-                val result = loopDetector.processInput(text)
-
-                // 2. Update the UI (Green or Red Card)
-                loopResult = result
-
-                // 3. Audio Feedback Logic
-                when (result) {
-                    is LoopResult.Recorded -> {
-                        // 🟢 Case 1: New Input
-                        // Just a short confirmation so the user knows it worked.
-                        // (You can remove this line if you want total silence for new inputs)
-                        ttsManager.speak("Okay.")
-                    }
-                    is LoopResult.Repeated -> {
-                        // 🔴 Case 2: Repetition Detected
-                        // This speaks the ERROR message you requested.
-                        ttsManager.speak("Error. Repetition detected. You just asked that.")
-                    }
-                }
-            }
-        }
 
         setContent {
             AMNESIATheme {
                 VoiceScreen(
                     loopResult = loopResult,
+                    history = historyList,
                     onMicClick = { checkMicPermissionAndStart() }
                 )
             }
@@ -75,10 +52,8 @@ class MainActivity : ComponentActivity() {
 
     private fun checkMicPermissionAndStart() {
         when {
-            ContextCompat.checkSelfPermission(
-                this, Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                speechManager.startListening()
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED -> {
+                startFreshListeningSession()
             }
             else -> {
                 requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
@@ -86,9 +61,53 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun startFreshListeningSession() {
+        speechManager?.destroy()
+        speechManager = SpeechManager(this) { text ->
+            runOnUiThread { processInput(text) }
+        }
+        speechManager?.startListening()
+    }
+
+    private fun processInput(text: String) {
+        val result = loopDetector.processInput(text)
+        loopResult = result
+
+        // Update history
+        historyList.add(0, text)
+        if (historyList.size > 10) historyList.removeLast()
+
+        when (result) {
+            is LoopResult.Recorded -> {
+                ttsManager.speak("Okay.")
+            }
+            is LoopResult.Repeated -> {
+                ttsManager.speak("Error. Repetition detected. You just asked that.")
+                triggerErrorVibration()
+            }
+        }
+    }
+
+    private fun triggerErrorVibration() {
+        // SAFETY FIX: Try-Catch block prevents crash if permission is missing
+        try {
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (vibrator.hasVibrator()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val pattern = longArrayOf(0, 100, 100, 300)
+                    vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                } else {
+                    vibrator.vibrate(500)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MAIN", "Vibration failed (App did not crash): ${e.message}")
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        speechManager.destroy()
+        speechManager?.destroy()
         ttsManager.shutdown()
     }
 }
