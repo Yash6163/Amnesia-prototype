@@ -1,5 +1,6 @@
 package com.example.amnesia.ui.theme
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -18,8 +20,12 @@ import com.example.amnesia.logic.LoopResult
 @Composable
 fun VoiceScreen(
     loopResult: LoopResult?,
-    history: List<String>, // Receives history list
-    onMicClick: () -> Unit
+    history: List<String>,
+    statusText: String,
+    onEnrollStart: () -> Unit,
+    onEnrollStop: () -> Unit,
+    onQueryStart: () -> Unit,
+    onQueryStop: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -27,84 +33,143 @@ fun VoiceScreen(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // --- 1. STATUS CARD ---
+
+        // --- STATUS CARD ---
         if (loopResult != null) {
             StatusCard(loopResult)
         } else {
-            // Idle State
-            Text(
-                "Tap microphone to start monitoring",
-                color = Color.Gray,
-                modifier = Modifier.padding(top = 20.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // --- 2. HISTORY LIST (New Feature) ---
-        if (history.isNotEmpty()) {
-            Text(
-                text = "Recent Interaction Trace:",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.align(Alignment.Start)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LazyColumn(
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
                 modifier = Modifier
-                    .weight(1f) // Fill available space
                     .fillMaxWidth()
+                    .height(150.dp),
+                shape = RoundedCornerShape(24.dp)
             ) {
-                items(history) { item ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
-                        modifier = Modifier
-                            .padding(vertical = 4.dp)
-                            .fillMaxWidth()
-                    ) {
-                        Text(
-                            text = item,
-                            modifier = Modifier.padding(12.dp),
-                            fontSize = 16.sp,
-                            color = Color.DarkGray
-                        )
-                    }
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Text("Ready to Listen", color = Color.Gray)
                 }
             }
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 3. MIC BUTTON ---
-        Button(
-            onClick = onMicClick,
-            modifier = Modifier
-                .size(width = 220.dp, height = 70.dp)
-                .padding(bottom = 16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+        Text(
+            text = "Status: $statusText",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.Blue
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- BUTTONS ---
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Text("🎤 Monitor Input", fontSize = 20.sp)
+
+            // ENROLL BUTTON
+            Button(
+                onClick = {},
+                modifier = Modifier
+                    .weight(1f)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = {
+                                onEnrollStart()
+                                tryAwaitRelease()
+                                onEnrollStop()
+                            }
+                        )
+                    },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE))
+            ) {
+                Text("Hold to Enroll\n(Voice ID)", textAlign = TextAlign.Center)
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // QUERY BUTTON
+            Button(
+                onClick = {},
+                modifier = Modifier
+                    .weight(1f)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = {
+                                onQueryStart()
+                                tryAwaitRelease()
+                                onQueryStop()
+                            }
+                        )
+                    },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text("Hold to Speak\n(Query)", textAlign = TextAlign.Center)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- HISTORY ---
+        Text(
+            text = "Recent History:",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.align(Alignment.Start)
+        )
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            items(history) { item ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFAFAFA)),
+                    modifier = Modifier
+                        .padding(vertical = 4.dp)
+                        .fillMaxWidth()
+                ) {
+                    Text(
+                        text = item,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 fun StatusCard(result: LoopResult) {
-    val (bgColor, icon, title, mainText, subText) = when (result) {
+
+    val (bgColor, icon, title, mainText) = when (result) {
         is LoopResult.Recorded -> {
-            FiveTuple(
-                Color(0xFFE8F5E9), "✅", "Input Recorded",
-                "\"${result.text}\"", "Waiting for next input..."
+            FourTuple(
+                Color(0xFFE8F5E9),
+                "✅",
+                "Input Recorded",
+                result.text
             )
         }
+
         is LoopResult.Repeated -> {
-            FiveTuple(
-                Color(0xFFFFEBEE), "⚠️", "Repetition Detected",
-                "\"${result.currentText}\"",
-                "Similar to: \"${result.previousText}\"\n(Asked ${result.secondsAgo}s ago)"
+            FourTuple(
+                Color(0xFFFFEBEE),
+                "⚠️",
+                "Repetition Detected",
+                result.currentText
+            )
+        }
+
+        else -> {
+            FourTuple(
+                Color.LightGray,
+                "ℹ️",
+                "Idle",
+                ""
             )
         }
     }
@@ -119,19 +184,25 @@ fun StatusCard(result: LoopResult) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(text = icon, fontSize = 48.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = title, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.Black)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = mainText, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center, color = Color.Black)
-
-            if (subText.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color.Black.copy(alpha = 0.1f))
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(text = subText, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = Color.DarkGray)
-            }
+            Text(
+                text = title,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = mainText,
+                textAlign = TextAlign.Center,
+                color = Color.Black
+            )
         }
     }
 }
 
-data class FiveTuple(val c: Color, val i: String, val t: String, val m: String, val s: String)
+data class FourTuple(
+    val bg: Color,
+    val icon: String,
+    val title: String,
+    val message: String
+)

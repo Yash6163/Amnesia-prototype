@@ -1,35 +1,25 @@
 package com.example.amnesia.logic
-
 import android.util.Log
 import java.util.Locale
-
 class LoopDetector {
-
     private var lastInputText: String? = null
     private var lastTimestamp: Long = 0
-
     // SENSITIVITY FIX: Lowered to 0.20 (20%) so it catches loops easily
     private val SIMILARITY_THRESHOLD = 0.20f
     private val TIME_WINDOW_MS = 60000L // Increased to 60 seconds
-
     // Very minimal stop words list
     private val STOP_WORDS = setOf("the", "a", "an", "to", "of")
-
     fun processInput(currentInput: String): LoopResult {
         val currentTime = System.currentTimeMillis()
         Log.d("LoopDetector", "Processing: '$currentInput'")
-
         if (lastInputText != null) {
             val timeDiff = currentTime - lastTimestamp
-
             if (timeDiff <= TIME_WINDOW_MS) {
                 // Compare inputs
                 val currentTokens = preprocess(currentInput)
                 val lastTokens = preprocess(lastInputText!!)
-
                 val similarity = calculateSimilarity(currentTokens, lastTokens)
                 Log.d("LoopDetector", "Score: $similarity (Need $SIMILARITY_THRESHOLD)")
-
                 if (similarity >= SIMILARITY_THRESHOLD) {
                     return LoopResult.Repeated(
                         currentText = currentInput,
@@ -39,14 +29,11 @@ class LoopDetector {
                 }
             }
         }
-
         // Save new input as the "Anchor"
         lastInputText = currentInput
         lastTimestamp = currentTime
-
         return LoopResult.Recorded(currentInput)
     }
-
     private fun calculateSimilarity(set1: Set<String>, set2: Set<String>): Float {
         val union = (set1 + set2).size
         if (union == 0) return 0f
