@@ -7,15 +7,18 @@ pluginManagement {
                 includeGroupByRegex("androidx.*")
             }
         }
-        mavenCentral() // <--- THIS IS REQUIRED
+        mavenCentral()
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
-        mavenCentral() // <--- THIS IS REQUIRED
+        mavenCentral()
+        // ✅ FIXED: Added the closing '}' here
+        maven { url = uri("https://jitpack.io") }
     }
 }
 

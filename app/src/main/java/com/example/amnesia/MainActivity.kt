@@ -2,7 +2,6 @@ package com.example.amnesia
 
 import android.Manifest
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,29 +10,25 @@ import com.example.amnesia.logic.LoopDetector
 import com.example.amnesia.logic.LoopResult
 import com.example.amnesia.ui.theme.AMNESIATheme
 import com.example.amnesia.ui.theme.VoiceScreen
-import com.example.amnesia.voice.SpeechManager
+import com.example.amnesia.voice.EnrollmentManager
+import com.example.amnesia.voice.SmartListener
 import com.example.amnesia.voice.TTSManager
 
 class MainActivity : ComponentActivity() {
 
     private val loopDetector = LoopDetector()
-
-    private lateinit var speechManager: SpeechManager
+    private lateinit var smartListener: SmartListener
+    private lateinit var enrollmentManager: EnrollmentManager
     private lateinit var ttsManager: TTSManager
 
-    private var isSpeechReady by mutableStateOf(false)
-
+    // State
     private var loopResult by mutableStateOf<LoopResult?>(null)
     private val historyList = mutableStateListOf<String>()
-    private var statusText by mutableStateOf("Idle")
+    private var statusText by mutableStateOf("Ready to Enroll") // Changed initial status
 
     private val requestPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                initSpeech()
-            } else {
-                statusText = "Mic Permission Denied!"
-            }
+            if (granted) initSpeech() else statusText = "Mic Permission Denied!"
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,43 +41,36 @@ class MainActivity : ComponentActivity() {
                     loopResult = loopResult,
                     history = historyList,
                     statusText = statusText,
-
                     onEnrollStart = {
-                        if (isSpeechReady) {
-                            Log.d("UI", "Enroll start")
-                            speechManager.startRecordingForEnrollment()
-                        }
+                        // Ensure background listener is OFF before recording
+                        smartListener.stop()
+                        enrollmentManager.startEnrollment()
+                        statusText = "🎙️ Recording Voice ID..."
                     },
-
                     onEnrollStop = {
-                        if (isSpeechReady) {
-                            speechManager.stopRecording()
+                        statusText = "Uploading..."
+                        enrollmentManager.stopAndUpload { result ->
+                            runOnUiThread {
+                                statusText = result
+                                // ✅ ONLY Start Listening if Enrollment Succeeded
+                                if (result.contains("Success")) {
+                                    smartListener.startListening()
+                                }
+                            }
                         }
                     },
-
-                    onQueryStart = {
-                        if (isSpeechReady) {
-                            Log.d("UI", "Query start")
-                            speechManager.startRecordingForQuery()
-                        }
-                    },
-
-                    onQueryStop = {
-                        if (isSpeechReady) {
-                            speechManager.stopRecording()
-                        }
-                    }
+                    onQueryStart = {},
+                    onQueryStop = {}
                 )
             }
         }
     }
 
     private fun initSpeech() {
-        Log.d("MainActivity", "initSpeech() called")
-
         ttsManager = TTSManager(this)
+        enrollmentManager = EnrollmentManager(this)
 
-        speechManager = SpeechManager(
+        smartListener = SmartListener(
             context = this,
             onSpeechResult = { text ->
                 runOnUiThread { processInput(text) }
@@ -92,19 +80,14 @@ class MainActivity : ComponentActivity() {
             }
         )
 
-        isSpeechReady = true
-        Log.d("MainActivity", "Speech READY")
+        // ❌ REMOVED: smartListener.startListening()
+        // We now wait for the user to enroll first.
     }
 
     private fun processInput(text: String) {
         val result = loopDetector.processInput(text)
         loopResult = result
-
         historyList.add(0, text)
-        if (historyList.size > 10) {
-            historyList.removeAt(historyList.lastIndex)
-        }
-
         if (result is LoopResult.Repeated) {
             ttsManager.speak("You just asked that.")
         }
@@ -112,6 +95,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        smartListener.stop()
         ttsManager.shutdown()
     }
 }
