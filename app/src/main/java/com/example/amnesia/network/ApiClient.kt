@@ -4,9 +4,9 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
-    // REPLACE THIS WITH YOUR LAPTOP'S IP ADDRESS
-    // Keep http:// and :5000/
-    private const val BASE_URL = "http://10.171.33.166:5001/"
+    // ✅ REMOVED 'private' so SpeechManager can read it
+    // ✅ KEEP 127.0.0.1 because you ran 'adb reverse'
+    const val BASE_URL = "http://127.0.0.1:5001/"
 
     val service: ApiService by lazy {
         Retrofit.Builder()

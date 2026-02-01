@@ -1,5 +1,6 @@
 package com.example.amnesia.ui.theme
 
+import android.util.Log
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,174 +29,126 @@ fun VoiceScreen(
     onQueryStop: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // --- STATUS CARD ---
         if (loopResult != null) {
             StatusCard(loopResult)
         } else {
             Card(
+                modifier = Modifier.fillMaxWidth().height(150.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp),
                 shape = RoundedCornerShape(24.dp)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Ready to Listen", color = Color.Gray)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
+        Text("Status: $statusText", color = Color.Blue)
+        Spacer(Modifier.height(16.dp))
 
-        Text(
-            text = "Status: $statusText",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.Blue
-        )
+        // ... inside VoiceScreen ...
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
 
-        // --- BUTTONS ---
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
+            // ✅ FIXED: Changed color from 'primary' to 'Color.Blue' so it is visible
+            VoiceButton(
+                text = "Hold to Enroll\n(Voice ID)",
+                color = Color.Blue,
+                onPressDown = onEnrollStart,
+                onPressUp = onEnrollStop,
+                modifier = Modifier.weight(1f)
+            )
 
-            // ENROLL BUTTON
-            Button(
-                onClick = {},
-                modifier = Modifier
-                    .weight(1f)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                onEnrollStart()
-                                tryAwaitRelease()
-                                onEnrollStop()
-                            }
-                        )
-                    },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE))
-            ) {
-                Text("Hold to Enroll\n(Voice ID)", textAlign = TextAlign.Center)
-            }
+            Spacer(Modifier.width(16.dp))
 
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // QUERY BUTTON
-            Button(
-                onClick = {},
-                modifier = Modifier
-                    .weight(1f)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                onQueryStart()
-                                tryAwaitRelease()
-                                onQueryStop()
-                            }
-                        )
-                    },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text("Hold to Speak\n(Query)", textAlign = TextAlign.Center)
-            }
+            VoiceButton(
+                text = "Hold to Speak\n(Query)",
+                color = Color.DarkGray, // Changed to DarkGray for contrast
+                onPressDown = onQueryStart,
+                onPressUp = onQueryStop,
+                modifier = Modifier.weight(1f)
+            )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(Modifier.height(24.dp))
+        Text("Recent History:", modifier = Modifier.align(Alignment.Start))
 
-        // --- HISTORY ---
-        Text(
-            text = "Recent History:",
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
+        LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
             items(history) { item ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFAFAFA)),
-                    modifier = Modifier
-                        .padding(vertical = 4.dp)
-                        .fillMaxWidth()
-                ) {
-                    Text(
-                        text = item,
-                        modifier = Modifier.padding(12.dp)
-                    )
+                Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Text(item, Modifier.padding(12.dp))
                 }
             }
         }
     }
 }
 
+// ✅ NEW COMPONENT: A Card that acts like a Button but allows "Hold" gestures
 @Composable
-fun StatusCard(result: LoopResult) {
-
-    val (bgColor, icon, title, mainText) = when (result) {
-        is LoopResult.Recorded -> {
-            FourTuple(
-                Color(0xFFE8F5E9),
-                "✅",
-                "Input Recorded",
-                result.text
-            )
-        }
-
-        is LoopResult.Repeated -> {
-            FourTuple(
-                Color(0xFFFFEBEE),
-                "⚠️",
-                "Repetition Detected",
-                result.currentText
-            )
-        }
-
-        else -> {
-            FourTuple(
-                Color.LightGray,
-                "ℹ️",
-                "Idle",
-                ""
+fun VoiceButton(
+    text: String,
+    color: Color,
+    onPressDown: () -> Unit,
+    onPressUp: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = color),
+        shape = RoundedCornerShape(50), // Makes it pill-shaped like a button
+        modifier = modifier
+            .height(60.dp) // Fixed height for touch target
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        try {
+                            Log.d("UI", "Button Pressed: $text")
+                            onPressDown() // Trigger Start
+                            awaitRelease() // Wait for user to lift finger
+                        } finally {
+                            Log.d("UI", "Button Released: $text")
+                            onPressUp() // Trigger Stop
+                        }
+                    }
+                )
+            }
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
             )
         }
     }
+}
+
+@Composable
+fun StatusCard(result: LoopResult) {
+    val (bg, icon, title, text) = when (result) {
+        is LoopResult.Recorded ->
+            FourTuple(Color(0xFFE8F5E9), "✅", "Input Recorded", result.text)
+
+        is LoopResult.Repeated ->
+            FourTuple(Color(0xFFFFEBEE), "⚠️", "Repetition Detected", result.currentText)
+    }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = bg),
+        shape = RoundedCornerShape(24.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(text = icon, fontSize = 48.sp)
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                color = Color.Black
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = mainText,
-                textAlign = TextAlign.Center,
-                color = Color.Black
-            )
+        Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(icon, fontSize = 48.sp)
+            Text(title, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(text, textAlign = TextAlign.Center)
         }
     }
 }
