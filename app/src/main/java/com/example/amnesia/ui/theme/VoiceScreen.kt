@@ -129,6 +129,7 @@ fun VoiceButton(
     }
 }
 
+
 @Composable
 fun StatusCard(result: LoopResult) {
     val (bg, icon, title, text) = when (result) {
