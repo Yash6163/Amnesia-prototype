@@ -1,96 +1,100 @@
 package com.example.amnesia.voice
 
 import android.content.Context
-import android.content.Intent
-import android.media.AudioManager // <--- This is likely the missing import
-import android.os.Bundle
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
+import android.media.MediaRecorder
 import android.util.Log
-import java.util.Locale
+import com.example.amnesia.network.ApiClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 
 class SpeechManager(
     private val context: Context,
-    private val onSpeechResult: (String) -> Unit
-) : RecognitionListener {
+    private val onSpeechResult: (String) -> Unit,
+    private val onStatusChange: (String) -> Unit
+) {
+    private var mediaRecorder: MediaRecorder? = null
+    private var audioFile: File? = null
+    private var isRecording = false
+    private var isEnrollmentMode = false
 
-    private var speechRecognizer: SpeechRecognizer? = null
-    private var isListening = false
+    fun startRecordingForEnrollment() {
+        isEnrollmentMode = true
+        startRecording("enroll.m4a")
+        onStatusChange("Recording Voice ID...")
+    }
 
-    fun startListening() {
-        destroy()
+    fun startRecordingForQuery() {
+        isEnrollmentMode = false
+        startRecording("query.m4a")
+        onStatusChange("Listening...")
+    }
 
-        // Force Audio Hardware Wakeup
+    fun stopRecording() {
+        stopRecordingInternal()
+    }
+
+    private fun startRecording(fileName: String) {
         try {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            audioManager.mode = AudioManager.MODE_NORMAL
-            audioManager.stopBluetoothSco()
-            audioManager.isMicrophoneMute = false
-        } catch (e: Exception) {
-            Log.e("SPEECH", "Could not reset Audio Manager: ${e.message}")
-        }
-
-        if (SpeechRecognizer.isRecognitionAvailable(context)) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
-            speechRecognizer?.setRecognitionListener(this)
-
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1500L)
+            audioFile = File(context.cacheDir, fileName)
+            mediaRecorder = MediaRecorder().apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setOutputFile(audioFile?.absolutePath)
+                prepare()
+                start()
             }
-
-            Log.d("SPEECH", "Starting fresh listener...")
-            speechRecognizer?.startListening(intent)
-            isListening = true
-        } else {
-            Log.e("SPEECH", "Recognition not available on this device")
-        }
-    }
-
-    fun stopListening() {
-        if (isListening) {
-            Log.d("SPEECH", "Stopping listener")
-            speechRecognizer?.stopListening()
-            isListening = false
-        }
-    }
-
-    fun destroy() {
-        try {
-            speechRecognizer?.destroy()
+            isRecording = true
+            Log.d("SpeechManager", "✅ Mic Started: ${audioFile?.absolutePath}")
         } catch (e: Exception) {
-            Log.e("SPEECH", "Error destroying recognizer: ${e.message}")
+            Log.e("SpeechManager", "❌ Mic Failed", e)
+            onStatusChange("Mic Error")
         }
-        speechRecognizer = null
-        isListening = false
     }
 
-    override fun onReadyForSpeech(params: Bundle?) { Log.d("SPEECH", "Ready") }
-    override fun onBeginningOfSpeech() { Log.d("SPEECH", "Started") }
-    override fun onRmsChanged(rmsdB: Float) {}
-    override fun onBufferReceived(buffer: ByteArray?) {}
-    override fun onEndOfSpeech() { isListening = false }
+    private fun stopRecordingInternal() {
+        if (!isRecording) return
+        try {
+            mediaRecorder?.stop()
+            mediaRecorder?.release()
+        } catch (e: Exception) {}
+        mediaRecorder = null
+        isRecording = false
 
-    override fun onError(error: Int) {
-        Log.e("SPEECH", "Error code: $error")
-        isListening = false
-        destroy()
+        onStatusChange("Uploading...")
+        uploadFile(isEnrollmentMode)
     }
 
-    override fun onResults(results: Bundle?) {
-        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-        val text = matches?.firstOrNull() ?: ""
-        if (text.isNotEmpty()) {
-            onSpeechResult(text)
+    private fun uploadFile(isEnrollment: Boolean) {
+        val file = audioFile ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Log.d("SpeechManager", "📤 Uploading to ${ApiClient.BASE_URL}")
+                val requestFile = file.asRequestBody("audio/m4a".toMediaTypeOrNull())
+                val body = MultipartBody.Part.createFormData("audio", file.name, requestFile)
+
+                val response = if (isEnrollment) ApiClient.service.enrollUser(body)
+                else ApiClient.service.processAudio(body)
+
+                if (response.isSuccessful) {
+                    if (isEnrollment) onStatusChange("Enrollment Success!")
+                    else {
+                        val result = response.body() as? com.example.amnesia.network.ProcessResponse
+                        onSpeechResult(result?.text ?: "")
+                        onStatusChange("Success")
+                    }
+                } else {
+                    onStatusChange("Server Error: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("SpeechManager", "❌ Network Error: ${e.message}")
+                onStatusChange("Failed to Connect")
+            }
         }
-        destroy()
     }
-
-    override fun onPartialResults(partialResults: Bundle?) {}
-    override fun onEvent(eventType: Int, params: Bundle?) {}
 }

@@ -1,5 +1,7 @@
 package com.example.amnesia.ui.theme
 
+import android.util.Log
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -18,120 +21,142 @@ import com.example.amnesia.logic.LoopResult
 @Composable
 fun VoiceScreen(
     loopResult: LoopResult?,
-    history: List<String>, // Receives history list
-    onMicClick: () -> Unit
+    history: List<String>,
+    statusText: String,
+    onEnrollStart: () -> Unit,
+    onEnrollStop: () -> Unit,
+    onQueryStart: () -> Unit,
+    onQueryStop: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // --- 1. STATUS CARD ---
+
         if (loopResult != null) {
             StatusCard(loopResult)
         } else {
-            // Idle State
-            Text(
-                "Tap microphone to start monitoring",
-                color = Color.Gray,
-                modifier = Modifier.padding(top = 20.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // --- 2. HISTORY LIST (New Feature) ---
-        if (history.isNotEmpty()) {
-            Text(
-                text = "Recent Interaction Trace:",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.align(Alignment.Start)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f) // Fill available space
-                    .fillMaxWidth()
+            Card(
+                modifier = Modifier.fillMaxWidth().height(150.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
+                shape = RoundedCornerShape(24.dp)
             ) {
-                items(history) { item ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
-                        modifier = Modifier
-                            .padding(vertical = 4.dp)
-                            .fillMaxWidth()
-                    ) {
-                        Text(
-                            text = item,
-                            modifier = Modifier.padding(12.dp),
-                            fontSize = 16.sp,
-                            color = Color.DarkGray
-                        )
-                    }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Ready to Listen", color = Color.Gray)
                 }
             }
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
+        Text("Status: $statusText", color = Color.Blue)
+        Spacer(Modifier.height(16.dp))
 
-        // --- 3. MIC BUTTON ---
-        Button(
-            onClick = onMicClick,
-            modifier = Modifier
-                .size(width = 220.dp, height = 70.dp)
-                .padding(bottom = 16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-        ) {
-            Text("🎤 Monitor Input", fontSize = 20.sp)
+        // ... inside VoiceScreen ...
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+
+            // ✅ FIXED: Changed color from 'primary' to 'Color.Blue' so it is visible
+            VoiceButton(
+                text = "Hold to Enroll\n(Voice ID)",
+                color = Color.Blue,
+                onPressDown = onEnrollStart,
+                onPressUp = onEnrollStop,
+                modifier = Modifier.weight(1f)
+            )
+
+            Spacer(Modifier.width(16.dp))
+
+            VoiceButton(
+                text = "Hold to Speak\n(Query)",
+                color = Color.DarkGray, // Changed to DarkGray for contrast
+                onPressDown = onQueryStart,
+                onPressUp = onQueryStop,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+        Text("Recent History:", modifier = Modifier.align(Alignment.Start))
+
+        LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
+            items(history) { item ->
+                Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Text(item, Modifier.padding(12.dp))
+                }
+            }
         }
     }
 }
+
+// ✅ NEW COMPONENT: A Card that acts like a Button but allows "Hold" gestures
+@Composable
+fun VoiceButton(
+    text: String,
+    color: Color,
+    onPressDown: () -> Unit,
+    onPressUp: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = color),
+        shape = RoundedCornerShape(50), // Makes it pill-shaped like a button
+        modifier = modifier
+            .height(60.dp) // Fixed height for touch target
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        try {
+                            Log.d("UI", "Button Pressed: $text")
+                            onPressDown() // Trigger Start
+                            awaitRelease() // Wait for user to lift finger
+                        } finally {
+                            Log.d("UI", "Button Released: $text")
+                            onPressUp() // Trigger Stop
+                        }
+                    }
+                )
+            }
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
 
 @Composable
 fun StatusCard(result: LoopResult) {
-    val (bgColor, icon, title, mainText, subText) = when (result) {
-        is LoopResult.Recorded -> {
-            FiveTuple(
-                Color(0xFFE8F5E9), "✅", "Input Recorded",
-                "\"${result.text}\"", "Waiting for next input..."
-            )
-        }
-        is LoopResult.Repeated -> {
-            FiveTuple(
-                Color(0xFFFFEBEE), "⚠️", "Repetition Detected",
-                "\"${result.currentText}\"",
-                "Similar to: \"${result.previousText}\"\n(Asked ${result.secondsAgo}s ago)"
-            )
-        }
+    val (bg, icon, title, text) = when (result) {
+        is LoopResult.Recorded ->
+            FourTuple(Color(0xFFE8F5E9), "✅", "Input Recorded", result.text)
+
+        is LoopResult.Repeated ->
+            FourTuple(Color(0xFFFFEBEE), "⚠️", "Repetition Detected", result.currentText)
     }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = bg),
+        shape = RoundedCornerShape(24.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(text = icon, fontSize = 48.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = title, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.Black)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = mainText, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center, color = Color.Black)
-
-            if (subText.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color.Black.copy(alpha = 0.1f))
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(text = subText, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = Color.DarkGray)
-            }
+        Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(icon, fontSize = 48.sp)
+            Text(title, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(text, textAlign = TextAlign.Center)
         }
     }
 }
 
-data class FiveTuple(val c: Color, val i: String, val t: String, val m: String, val s: String)
+data class FourTuple(
+    val bg: Color,
+    val icon: String,
+    val title: String,
+    val message: String
+)

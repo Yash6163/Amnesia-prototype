@@ -7,7 +7,7 @@ pluginManagement {
                 includeGroupByRegex("androidx.*")
             }
         }
-        mavenCentral()
+        mavenCentral() // <--- THIS IS REQUIRED
         gradlePluginPortal()
     }
 }
@@ -15,9 +15,9 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
-        mavenCentral()
+        mavenCentral() // <--- THIS IS REQUIRED
     }
 }
 
-rootProject.name = "AMNESIA"
+rootProject.name = "Amnesia-prototype"
 include(":app")
