@@ -6,59 +6,84 @@ import android.util.Log
 import com.example.amnesia.network.ApiClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
-import java.io.IOException
 
 class EnrollmentManager(private val context: Context) {
     private var mediaRecorder: MediaRecorder? = null
     private var audioFile: File? = null
+    private var startTime: Long = 0
 
     fun startEnrollment() {
         audioFile = File(context.cacheDir, "enroll.m4a")
-        mediaRecorder = MediaRecorder().apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setOutputFile(audioFile?.absolutePath)
-            try {
+        if (audioFile?.exists() == true) audioFile?.delete()
+
+        try {
+            mediaRecorder = MediaRecorder().apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioEncodingBitRate(128000)
+                setAudioSamplingRate(16000) // Match server
+                setOutputFile(audioFile?.absolutePath)
                 prepare()
                 start()
-                Log.d("Enrollment", "Recording started")
-            } catch (e: IOException) {
-                Log.e("Enrollment", "Failed to start", e)
             }
+            startTime = System.currentTimeMillis()
+            Log.d("Enrollment", "✅ Recorder Started")
+        } catch (e: Exception) {
+            Log.e("Enrollment", "❌ Failed to start", e)
         }
     }
 
-    fun stopAndUpload(onResult: (String) -> Unit) {
+    fun stopAndUpload(role: String, onResult: (String) -> Unit) {
+        // ✅ SAFETY CHECK: Ensure we recorded at least 1.5 seconds
+        val duration = System.currentTimeMillis() - startTime
+        if (duration < 1500) {
+            CoroutineScope(Dispatchers.IO).launch {
+                delay(1500 - duration) // Wait until 1.5s passes
+                stopAndUploadInternal(role, onResult)
+            }
+        } else {
+            stopAndUploadInternal(role, onResult)
+        }
+    }
+
+    private fun stopAndUploadInternal(role: String, onResult: (String) -> Unit) {
         try {
             mediaRecorder?.stop()
             mediaRecorder?.release()
         } catch (e: Exception) {
-            // Handle crash if stopped too soon
+            // -1007 happens if file is empty.
+            Log.e("Enrollment", "Stop failed (probably empty)", e)
         }
         mediaRecorder = null
 
-        // Upload to /enroll endpoint
+        val file = audioFile
+        if (file == null || !file.exists() || file.length() < 100) {
+            onResult("❌ Audio too short/empty. Try again.")
+            return
+        }
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val file = audioFile ?: return@launch
                 val requestFile = file.asRequestBody("audio/m4a".toMediaTypeOrNull())
                 val body = MultipartBody.Part.createFormData("audio", file.name, requestFile)
+                val rolePart = MultipartBody.Part.createFormData("role", role)
 
-                // Call the ENROLL endpoint
-                val response = ApiClient.service.enrollUser(body)
+                val response = ApiClient.service.enrollUser(body, rolePart)
+
                 if (response.isSuccessful) {
-                    onResult("✅ Enrollment Success!")
+                    onResult("✅ Success!")
                 } else {
-                    onResult("❌ Server Error")
+                    onResult("❌ Server Error: ${response.code()}")
                 }
             } catch (e: Exception) {
-                onResult("❌ Connection Failed")
+                onResult("❌ Connection/Timeout Error")
             }
         }
     }
