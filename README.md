@@ -1,121 +1,124 @@
-# 🧠 Amnesia Prototype
-
+<h1 align="center">Amnesia Prototype</h1>
 <p align="center">
-<b>AI-Driven Memory Simulation & Psychological Horror Experience</b>
+<b>AI-Based Voice Recognition & Memory Simulation System</b>
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
-<img src="https://img.shields.io/badge/Pygame-Engine-1C1C1C?style=for-the-badge&logo=pygame&logoColor=white"/>
+<img src="https://img.shields.io/badge/Android-App-3DDC84?style=for-the-badge&logo=android&logoColor=white"/>
+<img src="https://img.shields.io/badge/Kotlin-Jetpack-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white"/>
+<img src="https://img.shields.io/badge/Python-Backend-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
 <img src="https://img.shields.io/badge/Project-Prototype-6A5ACD?style=for-the-badge"/>
 </p>
 
 ---
 
-## 🧩 Overview
+## 🧠 Overview
 
-**Amnesia Prototype** is an experimental psychological simulation that explores memory loss, perception distortion, and interactive storytelling.
+**Amnesia Prototype** is an experimental system that combines **voice recognition, AI processing, and mobile interaction** to simulate memory-based behavior and intelligent responses.
 
-Unlike traditional games, this project focuses on **immersive experience design**, where the player navigates through an uncertain environment with fragmented memory and evolving perception.
+The project consists of:
+- An **Android application** (frontend)
+- A **Python backend server** (processing & recognition)
 
-The system dynamically alters gameplay elements to simulate confusion, tension, and discovery — mimicking the feeling of *amnesia*.
+The system captures user input (voice/text), processes it through backend logic, and returns intelligent responses — simulating **memory and recognition behavior**.
 
 ---
 
 ## ⚙️ How It Works
 
-The prototype simulates a psychological loop where perception and memory constantly shift:
+The system follows a client-server workflow:
 
-1. The player enters an unknown environment.
-2. Visual and environmental cues provide partial information.
-3. Memory inconsistencies are introduced dynamically.
-4. The environment subtly changes based on player interaction.
-5. Objects, paths, or events may appear/disappear.
-6. Player decisions influence perception of reality.
-7. The system creates a sense of uncertainty and tension.
-8. The experience evolves as the player progresses.
+1. User interacts with the Android app  
+2. Voice or input data is captured  
+3. Data is sent to the Python backend server  
+4. Backend processes input using recognition logic  
+5. Relevant response is generated  
+6. Response is sent back to the app  
+7. App displays or reacts to the output  
+
+This creates a **real-time intelligent interaction system**.
 
 ---
 
 ## 📁 Project Structure
 
-| File | Description |
-|------|-------------|
-| main.py | Entry point of the game prototype |
-| game_engine.py | Core logic for rendering and interactions |
-| player.py | Handles player movement and controls |
-| environment.py | Manages dynamic environment behavior |
-| memory_system.py | Simulates memory distortion and changes |
-| assets/ | Game assets like images, sounds, etc. |
+| File / Folder | Description |
+|--------------|-------------|
+| `.idea/` | IDE configuration files (Android Studio) |
+| `app/` | Main Android application source code |
+| `gradle/` | Gradle build system files |
+| `.gitignore` | Specifies ignored files for Git |
+| `build.gradle.kts` | Project-level build configuration |
+| `settings.gradle.kts` | Project settings and module configuration |
+| `gradle.properties` | Gradle environment properties |
+| `gradlew / gradlew.bat` | Gradle wrapper scripts |
+| `server.py` | Python backend server handling recognition and processing |
+| `Medium-Phone-API...` | Android emulator/device configuration |
+| `README.md` | Project documentation |
 
 ---
 
-## 🎮 Features
+## 📱 Android App Features
 
-### 🧠 Dynamic Memory Simulation
-- Environment changes based on player actions  
-- Inconsistent world design to simulate memory loss  
-
-### 🌫️ Psychological Effects
-- Visual distortion and ambiguity  
-- Unpredictable environmental behavior  
-
-### 🎯 Interactive Exploration
-- Player-driven narrative  
-- Hidden clues and evolving storyline  
-
-### 🔄 Non-Linear Experience
-- No fixed path or outcome  
-- Replayability through different interactions  
+- User interaction interface  
+- Input handling (voice/text)  
+- Communication with backend server  
+- Real-time response display  
 
 ---
 
-## 🖥️ Gameplay Demonstration
+## 🖥️ Backend Features (Python)
 
-The prototype focuses on creating **atmosphere and psychological tension** rather than traditional mechanics.
+- Input processing and recognition  
+- Response generation logic  
+- Server-client communication handling  
+- Prototype AI/memory simulation logic  
 
-### 1. Initial Exploration State
-- Player enters unknown environment  
-- Limited information available  
-- Subtle hints guide movement  
+---
 
-### 2. Memory Distortion Phase
-- Environment begins to shift  
-- Objects behave inconsistently  
-- Confusion and uncertainty increase  
 
-### 3. Psychological Immersion
-- Reality becomes unreliable  
-- Player must interpret fragmented clues  
-- Experience becomes more intense  
+---
+
+## 🧪 Output Demonstration
+
+### 1. User Input Phase
+- User provides input via app  
+- Voice/text captured  
+
+### 2. Processing Phase
+- Data sent to backend  
+- Recognition logic executed  
+
+### 3. Response Phase
+- Intelligent output generated  
+- Displayed on mobile interface  
 
 ---
 
 ## 🚀 Future Improvements
 
-Possible extensions for the project:
-
-1. AI-driven narrative generation  
-2. Advanced sound design for immersion  
-3. Real-time decision-based story branching  
-4. Enhanced visual effects (lighting, shadows)  
-5. VR compatibility for deeper immersion  
+1. Integration with advanced AI models (LLMs)  
+2. Improved speech-to-text accuracy  
+3. Real-time streaming responses  
+4. Cloud deployment of backend  
+5. Enhanced UI/UX for mobile app  
 
 ---
 
-## 🧪 Learning Goals
+## 📚 Learning Outcomes
 
-This project helps explore:
-
-- Game development fundamentals (Pygame)
-- Human perception & cognitive simulation
-- Interactive storytelling design
-- Real-time system behavior changes
+- Android development using Kotlin  
+- Client-server architecture  
+- API communication  
+- Backend development with Python  
+- AI-based interaction systems  
 
 ---
 
 ## 📌 Conclusion
 
-**Amnesia Prototype** demonstrates how games can go beyond mechanics and create **psychological experiences**.
+**Amnesia Prototype** demonstrates how mobile applications can integrate with backend intelligence systems to create **interactive and adaptive user experiences**.
 
-By combining dynamic environments, memory simulation, and player-driven exploration, this prototype highlights the potential of using technology to simulate human perception and emotional response.
+By combining Android development with Python-based processing, this project highlights the foundation of real-world AI-powered applications.
+
+---
